@@ -242,3 +242,70 @@ def test_api_chat_confirm_and_validation(api_client):
         "module": "kubernetes",
         "permission": "write",
     } in tools
+
+
+def test_retraining_policy_fetches_facts_instead_of_trusting_llm_numbers():
+    """Regression (live run): the LLM passed a bogus epoch-ms value (model "4748 days old")
+    and omitted the pipeline state. The tool must look these up from the systems themselves."""
+    from datetime import datetime, timedelta, timezone
+
+    from pydantic import BaseModel
+
+    from agent.registry import Tool
+
+    class RunArgs(BaseModel):
+        run_id: str
+
+    class PathArgs(BaseModel):
+        path: str = "data/raw/dataset.csv"
+
+    class DagArgs(BaseModel):
+        dag_id: str
+        limit: int = 5
+
+    started = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    reg = ToolRegistry(default_timeout=5)
+    reg.register(
+        Tool(
+            "mlflow_get_run_details",
+            "run",
+            lambda a: {
+                "start_time": started,
+                "metrics": {"f1": 0.97},
+                "provenance": {"quality_gate": "passed", "dvc.data_md5": "a" * 32},
+            },
+            RunArgs,
+            module="mlflow",
+        )
+    )
+    reg.register(
+        Tool("dvc_get_dataset_version", "v", lambda a: {"md5": "b" * 32}, PathArgs, module="dvc")
+    )
+    reg.register(
+        Tool(
+            "airflow_get_dag_runs",
+            "runs",
+            lambda a: {"latest": {"dag_run_id": "r1", "state": "success"}},
+            DagArgs,
+            module="airflow",
+        )
+    )
+    register_policy_tool(reg, SETTINGS)
+
+    res = reg.execute(
+        tc(
+            "p",
+            "agent_assess_retraining",
+            run_id="abc",
+            dag_id="training_pipeline",
+            model_trained_at_ms=1,  # bogus value from the LLM: must be ignored
+        )
+    )
+    assert res.status == ToolStatus.OK, res.error
+    checks = res.data["checks"]
+    assert checks["freshness"].startswith("model age 2.0 days")
+    assert checks["last_pipeline_run"] == "success"
+    assert checks["data_drift"] == "tracked data changed"
+    assert res.data["input_sources"]["model_trained_at_ms"] == "mlflow run abc"
+    assert res.data["recommend_retraining"] is True  # only because the data changed
+    assert all("days old" not in r for r in res.data["reasons"])

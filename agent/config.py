@@ -63,6 +63,10 @@ class Settings(BaseModel):
         default_factory=lambda: float(os.getenv("AGENT_TOOL_TIMEOUT_SECONDS", "30"))
     )
     max_steps: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_STEPS", "10")))
+    # Per tool result sent back to the LLM. Lower it for small context / rate budgets (Groq free).
+    tool_result_max_chars: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_TOOL_RESULT_MAX_CHARS", "6000"))
+    )
     confirmation_ttl_seconds: int = 300
     retrain_freshness_days: int = Field(
         default_factory=lambda: int(os.getenv("RETRAIN_FRESHNESS_DAYS", "30"))

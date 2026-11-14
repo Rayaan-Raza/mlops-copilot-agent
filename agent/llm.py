@@ -87,13 +87,32 @@ class AnthropicProvider:
 
 
 # --------------------------------------------------------------------------- OpenAI-compatible
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+
+def openai_compatible_credentials(provider: str) -> tuple[str | None, str | None]:
+    """(api_key, base_url) for an OpenAI-compatible provider.
+
+    For ``groq`` only the Groq key and endpoint are used, so an unrelated ``OPENAI_API_KEY`` in
+    the shell environment is never sent to Groq (or a Groq key to OpenAI).
+    """
+    if provider == "groq":
+        key = os.getenv("GROQ_API_KEY") or os.getenv("GROQ_KEY")
+        return key, os.getenv("GROQ_BASE_URL") or GROQ_BASE_URL
+    return os.getenv("OPENAI_API_KEY"), os.getenv("OPENAI_BASE_URL") or None
+
+
 class OpenAIProvider:
-    def __init__(self, model: str, client: Any = None) -> None:
+    def __init__(self, model: str, client: Any = None, provider: str = "openai") -> None:
         if client is None:
             import openai
 
+            api_key, base_url = openai_compatible_credentials(provider)
+            # Free tiers (e.g. Groq) rate-limit per minute; the SDK honours `retry-after` on 429.
             client = openai.OpenAI(
-                api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_BASE_URL") or None
+                api_key=api_key,
+                base_url=base_url,
+                max_retries=int(os.getenv("LLM_MAX_RETRIES", "6")),
             )
         self.client, self.model = client, model
 
@@ -122,6 +141,9 @@ class OpenAIProvider:
     def complete(self, system: str, messages: list[dict], tools: list[dict]) -> LLMTurn:
         resp = self.client.chat.completions.create(
             model=self.model,
+            # Explicit cap: without it some gateways (OpenRouter) reserve the model's full output
+            # window and reject low-credit accounts with HTTP 402.
+            max_tokens=int(os.getenv("LLM_MAX_TOKENS", "4096")),
             messages=self._convert(system, messages),
             tools=[
                 {
@@ -170,5 +192,5 @@ def build_provider(provider: str, model: str) -> LLMProvider:
     if provider == "anthropic":
         return AnthropicProvider(model)
     if provider in ("openai", "groq", "gemini", "ollama"):
-        return OpenAIProvider(model)
-    raise ValueError(f"unknown LLM_PROVIDER {provider!r} (expected anthropic or openai)")
+        return OpenAIProvider(model, provider=provider)
+    raise ValueError(f"unknown LLM_PROVIDER {provider!r} (expected anthropic, openai or groq)")

@@ -42,7 +42,7 @@ Key settings in `.env`:
 
 | Variable | Purpose |
 |---|---|
-| `LLM_PROVIDER`, `LLM_MODEL`, `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`) | LLM used for tool calling |
+| `LLM_PROVIDER`, `LLM_MODEL`, `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`) / `GROQ_API_KEY` | LLM used for tool calling |
 | `MLFLOW_TRACKING_URI` | `http://localhost:5000` |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USERNAME`, `AIRFLOW_PASSWORD`, `AIRFLOW_ALLOWED_DAGS` | Airflow 3 API and the DAGs the agent may trigger |
 | `K8S_NAMESPACE`, `K8S_ALLOWED_NAMESPACES` | namespaces the agent may read and modify |
@@ -106,6 +106,9 @@ kubectl -n mlops-agent port-forward svc/ml-inference 8000:80   # then GET http:/
 
 > **Windows:** set `PYTHONUTF8=1`, because MLflow prints emoji that the default console encoding cannot render.
 > With an OpenAI key, set `LLM_PROVIDER=openai` and an OpenAI model in `.env`, for example `LLM_MODEL=gpt-4.1-mini`.
+> With a Groq key, set `LLM_PROVIDER=groq`, `GROQ_API_KEY` and a Groq model, for example `LLM_MODEL=openai/gpt-oss-120b`.
+> With OpenRouter, set `LLM_PROVIDER=openai`, `OPENAI_BASE_URL=https://openrouter.ai/api/v1`, `OPENAI_API_KEY` and a model such as `LLM_MODEL=openai/gpt-4.1-mini`. Lower `LLM_MAX_TOKENS` (default 4096) if the account has few credits.
+> Recorded runs and their write-ups are in [docs/conversations](docs/conversations/README.md).
 
 ```bash
 # CLI (asks y/n before any state-changing action)

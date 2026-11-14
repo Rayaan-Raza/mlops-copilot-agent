@@ -50,7 +50,11 @@ class Tool:
         schema.setdefault("properties", {})
         desc = self.description
         if self.permission == Permission.WRITE:
-            desc += " [STATE-CHANGING: requires explicit human confirmation before it runs.]"
+            desc += (
+                " [STATE-CHANGING. Calling it does NOT run it: the system holds the call and asks"
+                " the human to confirm with a token. If the user asked for this action, call it"
+                " directly instead of asking for confirmation in text.]"
+            )
         return {"name": self.name, "description": desc, "input_schema": schema}
 
 

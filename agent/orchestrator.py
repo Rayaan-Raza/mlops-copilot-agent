@@ -7,6 +7,7 @@ import logging
 import re
 import time
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -36,7 +37,9 @@ To link a model to its data: read the run's `dvc.data_md5` / `dvc.dataset_versio
 4. The best metric does not mean production-ready: always mention quality gate, overfitting gap, \
 data provenance and deployment status caveats returned by tools.
 5. State-changing tools (trigger DAG, restart/scale, dataset checkout) only ever produce a \
-confirmation request; never call them unless the user explicitly asked for that action. Never \
+confirmation request; never call them unless the user explicitly asked for that action. When \
+the user did ask, call the tool directly: do not ask for confirmation in text, because the system \
+holds the call and shows the human a confirmation token (that IS the confirmation step). Never \
 trigger retraining on your own - you may only recommend it, using agent_assess_retraining, and \
 only on evidence (freshness policy, failed quality gate, below-threshold metric, changed data, \
 user-reported degradation).
@@ -63,16 +66,66 @@ FAILED = {
 
 
 class RetrainingArgs(BaseModel):
+    run_id: str | None = Field(
+        None,
+        description="MLflow run to assess (best or deployed). The tool fetches its training time, "
+        "F1, quality gate and DVC hash itself. Preferred over the manual fields below.",
+    )
+    dag_id: str | None = Field(
+        None, description="Airflow training DAG; the tool looks up its latest run state itself"
+    )
     model_trained_at_ms: int | None = Field(
-        None, description="best/deployed run start_time in epoch ms"
+        None, description="only if no run_id: run start_time in epoch milliseconds"
     )
-    latest_f1: float | None = None
-    last_quality_gate: str | None = Field(None, description="'passed' / 'failed' from MLflow tags")
-    last_pipeline_state: str | None = Field(None, description="latest Airflow run state")
-    data_changed_since_training: bool | None = Field(
-        None, description="True if current DVC md5 differs from the run's dvc.data_md5"
-    )
+    latest_f1: float | None = Field(None, description="only if no run_id")
+    last_quality_gate: str | None = Field(None, description="only if no run_id")
+    last_pipeline_state: str | None = Field(None, description="only if no dag_id")
+    data_changed_since_training: bool | None = Field(None, description="only if no run_id")
     reported_degradation: str | None = Field(None, description="only if the USER supplied it")
+
+
+def _iso_to_ms(value: str | None) -> int | None:
+    if not value:
+        return None
+    return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp() * 1000)
+
+
+def gather_retraining_evidence(registry: ToolRegistry, a: RetrainingArgs) -> tuple[dict, dict]:
+    """Fill policy inputs from MLflow / DVC / Airflow, so the LLM never transcribes numbers.
+
+    Returns (policy_inputs, sources): each input records whether it came from a tool or from
+    the model's arguments, and a lookup that fails leaves the field ``None`` ("unknown").
+    """
+    inputs = a.model_dump(exclude={"run_id", "dag_id"})
+    sources = {k: "llm_argument" for k, v in inputs.items() if v is not None}
+
+    def fetch(name: str, **args):
+        res = registry.execute(ToolCall(id=f"policy-{name}", name=name, arguments=args))
+        return res.data if res.status == ToolStatus.OK else None
+
+    if a.run_id:
+        run = fetch("mlflow_get_run_details", run_id=a.run_id)
+        prov = (run or {}).get("provenance", {})
+        inputs["model_trained_at_ms"] = _iso_to_ms((run or {}).get("start_time"))
+        inputs["latest_f1"] = (run or {}).get("metrics", {}).get("f1")
+        inputs["last_quality_gate"] = prov.get("quality_gate")
+        path_arg = {"path": prov["dvc.data_path"]} if prov.get("dvc.data_path") else {}
+        current = fetch("dvc_get_dataset_version", **path_arg)
+        trained_md5, current_md5 = prov.get("dvc.data_md5"), (current or {}).get("md5")
+        inputs["data_changed_since_training"] = (
+            trained_md5 != current_md5 if trained_md5 and current_md5 else None
+        )
+        for key in ("model_trained_at_ms", "latest_f1", "last_quality_gate"):
+            sources[key] = f"mlflow run {a.run_id}" if inputs[key] is not None else "unavailable"
+        sources["data_changed_since_training"] = "dvc md5 comparison"
+    if a.dag_id:
+        runs = fetch("airflow_get_dag_runs", dag_id=a.dag_id, limit=1)
+        latest = (runs or {}).get("latest") or {}
+        inputs["last_pipeline_state"] = latest.get("state")
+        sources["last_pipeline_state"] = (
+            f"airflow {a.dag_id} {latest.get('dag_run_id', '')}".strip()
+        )
+    return inputs, sources
 
 
 def build_default_registry(settings: Settings | None = None) -> ToolRegistry:
@@ -93,17 +146,21 @@ def build_default_registry(settings: Settings | None = None) -> ToolRegistry:
 
 def register_policy_tool(registry: ToolRegistry, settings: Settings) -> None:
     def _assess(a: RetrainingArgs):
-        return assess_retraining(
-            **a.model_dump(),
+        inputs, sources = gather_retraining_evidence(registry, a)
+        result = assess_retraining(
+            **inputs,
             freshness_days=settings.retrain_freshness_days,
             min_f1=settings.retrain_min_f1,
         ).model_dump()
+        result["input_sources"] = sources
+        return result
 
     registry.register(
         Tool(
             "agent_assess_retraining",
-            "Apply the retraining policy (freshness, min F1, quality gate, data change) to evidence "
-            "gathered from other tools. Returns a recommendation only; never starts retraining.",
+            "Apply the retraining policy (freshness, min F1, quality gate, data change, last "
+            "pipeline run). Pass run_id (MLflow) and dag_id (Airflow): the tool fetches the facts "
+            "itself. Returns a recommendation only; never starts retraining.",
             _assess,
             RetrainingArgs,
             module="policy",
@@ -205,7 +262,7 @@ class Agent:
                         "role": "tool",
                         "call_id": call.id,
                         "name": call.name,
-                        "content": result.for_llm(),
+                        "content": result.for_llm(self.settings.tool_result_max_chars),
                     }
                 )
         else:
