@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 import pickle
@@ -11,32 +12,29 @@ from typing import Any
 import mlflow
 import mlflow.sklearn
 import pandas as pd
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 
 from training import provenance
 from training.config import load_params, repo_path
+from training.models import build_model
+
+__all__ = ["build_model", "run"]
 
 
-def build_model(model_type: str, hp: dict[str, Any], seed: int):
-    if model_type == "logistic_regression":
-        return make_pipeline(StandardScaler(), LogisticRegression(random_state=seed, **hp))
-    if model_type == "random_forest":
-        return RandomForestClassifier(random_state=seed, n_jobs=-1, **hp)
-    if model_type == "gradient_boosting":
-        return GradientBoostingClassifier(random_state=seed, **hp)
-    raise ValueError(f"unknown model_type {model_type!r}")
+# Types we create ourselves and therefore trust when MLflow serialises with skops (MLflow >= 3.x).
+SKOPS_TRUSTED_TYPES = ["sklearn.tree._tree.Tree", "sklearn._loss._loss.CyHalfBinomialLoss"]
 
 
 def _log_model(model) -> str:
-    """Log the sklearn model; supports both MLflow 2.x (artifact_path) and 3.x (name)."""
-    try:
-        info = mlflow.sklearn.log_model(model, name="model")
-    except TypeError:
-        info = mlflow.sklearn.log_model(model, artifact_path="model")
+    """Log the sklearn model; supports MLflow 2.x (artifact_path) and 3.x (name, skops)."""
+    params = inspect.signature(mlflow.sklearn.log_model).parameters
+    kwargs: dict[str, Any] = {}
+    if "skops_trusted_types" in params:
+        kwargs["skops_trusted_types"] = SKOPS_TRUSTED_TYPES
+    if "name" in params:
+        info = mlflow.sklearn.log_model(model, name="model", **kwargs)
+    else:
+        info = mlflow.sklearn.log_model(model, artifact_path="model", **kwargs)
     return info.model_uri
 
 
