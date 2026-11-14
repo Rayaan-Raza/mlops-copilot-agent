@@ -1,0 +1,49 @@
+stages:
+  validate:
+    cmd: python -m training.validate
+    deps:
+      - data/raw/dataset.csv
+      - training/validate.py
+    params:
+      - validation
+
+  preprocess:
+    cmd: python -m training.preprocess
+    deps:
+      - data/raw/dataset.csv
+      - training/preprocess.py
+    params:
+      - data
+    outs:
+      - data/processed/train.csv
+      - data/processed/test.csv
+
+  train:
+    cmd: python -m training.train
+    deps:
+      - data/processed/train.csv
+      - training/train.py
+    params:
+      - train
+    outs:
+      - models/model.pkl
+      - models/run_info.json:
+          cache: false
+
+  evaluate:
+    cmd: python -m training.evaluate
+    deps:
+      - data/processed/test.csv
+      - models/model.pkl
+      - training/evaluate.py
+    metrics:
+      - reports/metrics.json:
+          cache: false
+
+  quality_gate:
+    cmd: python -m training.quality_gate
+    deps:
+      - reports/metrics.json
+      - training/quality_gate.py
+    params:
+      - quality_gate
