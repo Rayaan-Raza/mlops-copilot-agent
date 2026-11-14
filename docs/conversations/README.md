@@ -1,7 +1,7 @@
 # Recorded agent conversations
 
 Real runs of `mlops-agent --json "<question>"` against the live local stack: Compose (MLflow 3.18, Airflow 3.1) and a kind cluster.
-The LLM is `openai/gpt-4.1-mini` through OpenRouter (`LLM_PROVIDER=openai`, `OPENAI_BASE_URL=https://openrouter.ai/api/v1`).
+The LLM is `openai/gpt-4.1-mini` through OpenRouter. These runs used `LLM_PROVIDER=openai` with `OPENAI_BASE_URL=https://openrouter.ai/api/v1`. The dedicated `LLM_PROVIDER=openrouter` added since sends exactly the same requests.
 Each JSON file is the full `AgentResponse`: answer, verified facts, evidence (the tool calls), uncertainties and pending confirmations.
 
 | # | File | Question | Tools called | What it shows |

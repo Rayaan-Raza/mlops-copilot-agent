@@ -176,3 +176,20 @@ def test_groq_provider_uses_groq_key_and_endpoint(monkeypatch):
     monkeypatch.setenv("GROQ_KEY", "gsk_test")
     assert openai_compatible_credentials("groq") == ("gsk_test", GROQ_BASE_URL)
     assert openai_compatible_credentials("openai")[0] == "sk-openai-test"
+
+
+def test_openrouter_uses_its_own_key_even_with_a_shell_openai_key(monkeypatch):
+    """A stale OPENAI_API_KEY in the shell wins over .env (dotenv does not override), so
+    OpenRouter must read OPENROUTER_API_KEY and its own endpoint."""
+    import pytest
+
+    from agent.llm import OPENROUTER_BASE_URL, OpenAIProvider, openai_compatible_credentials
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-proj-stale")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+    monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
+    assert openai_compatible_credentials("openrouter") == ("sk-or-v1-test", OPENROUTER_BASE_URL)
+
+    monkeypatch.delenv("OPENROUTER_API_KEY")
+    with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
+        OpenAIProvider("openai/gpt-4.1-mini", provider="openrouter")
