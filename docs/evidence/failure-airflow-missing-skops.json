@@ -1,0 +1,90 @@
+{
+  "airflow_get_failed_tasks": {
+    "tool": "airflow_get_failed_tasks",
+    "call_id": "airflow_get_failed_tasks",
+    "status": "ok",
+    "data": {
+      "dag_id": "training_pipeline",
+      "run_id": "manual__2026-11-14T18:44:43.273891+00:00_ZZEFL8Uy",
+      "failed_tasks": [
+        {
+          "task_id": "train_model",
+          "state": "failed",
+          "try_number": 3,
+          "max_tries": 2,
+          "duration": 46.574656,
+          "start_date": "2026-11-14T18:47:11.678868Z",
+          "end_date": "2026-11-14T18:47:58.253524Z",
+          "operator": "_PythonDecoratedOperator"
+        }
+      ],
+      "blocked_downstream_tasks": [
+        "evaluate_and_log_mlflow",
+        "apply_quality_gate",
+        "promote_model"
+      ],
+      "diagnostics": [
+        {
+          "task_id": "train_model",
+          "error_lines": [
+            "2026-11-14T18:47:53.171120Z ERROR Task failed with exception",
+            "[{'exc_type': 'ModuleNotFoundError', 'exc_value': \"No module named 'skops'\", 'exc_notes': [], 'syntax_error': None, 'is_cause': False, 'frames': [{'filename': '/home/airflow/.local/lib/python3.11/site-packages/airflow/sdk/execution_time/task_runner.py', 'lineno': 920, 'name': 'run'}, {'filename': '/home/airflow/.local/lib/python3.11/site-packages/airflow/sdk/execution_time/task_runner.py', 'lineno': 1302, 'name': '_execute_task'}, {'filename': '/home/airflow/.local/lib/python3.11/site-packages/airflow/sdk/bases/operator.py', 'lineno': 416, 'name': 'wrapper'}, {'filename': '/home/airflow/.local/lib/python3.11/site-packages/airflow/sdk/bases/decorator.py', 'lineno': 252, 'name': 'execute'}, {'filename': '/home/airflow/.local/lib/python3.11/site-packages/airflow/sdk/bases/operator.py', 'lineno': 416, 'name': 'wrapper'}, {'filename': '/home/airflow/.local/lib/python3.11/site-packages/airflow/providers/standard/operators/python.py', 'lineno': 216, 'name': 'execute'}, {'filename': '/home/airflow/.local/lib/python3.11/site-packages/airflow/providers/standard/operators/python.py', 'lineno': 239, 'name': 'execute_callable'}, {'filename': '/home/airflow/.local/lib/python3.11/site-packages/airflow/sdk/execution_time/callback_runner.py', 'lineno': 82, 'name': 'run'}, {'filename': '/opt/airflow/dags/training_pipeline.py', 'lineno': 75, 'name': 'train_model'}, {'filename': '/opt/mlops/training/train.py', 'lineno': 68, 'name': 'run'}, {'filename': '/opt/mlops/training/train.py', 'lineno': 3"
+          ]
+        }
+      ]
+    },
+    "error": null,
+    "duration_ms": 3425.2,
+    "confirmation_token": null
+  },
+  "airflow_get_dag_runs": {
+    "tool": "airflow_get_dag_runs",
+    "call_id": "airflow_get_dag_runs",
+    "status": "ok",
+    "data": {
+      "dag_id": "training_pipeline",
+      "runs": [
+        {
+          "dag_run_id": "manual__2026-11-14T18:51:34.530726+00:00_shje8dn2",
+          "state": "success",
+          "run_type": "manual",
+          "logical_date": null,
+          "start_date": "2026-11-14T18:51:35.149636Z",
+          "end_date": "2026-11-14T18:53:55.299968Z",
+          "conf": {
+            "model_type": "random_forest"
+          }
+        },
+        {
+          "dag_run_id": "manual__2026-11-14T18:44:43.273891+00:00_ZZEFL8Uy",
+          "state": "failed",
+          "run_type": "manual",
+          "logical_date": null,
+          "start_date": "2026-11-14T18:44:45.176390Z",
+          "end_date": "2026-11-14T18:48:02.774318Z",
+          "conf": {
+            "model_type": "random_forest"
+          }
+        }
+      ],
+      "state_counts": {
+        "success": 1,
+        "failed": 1
+      },
+      "latest": {
+        "dag_run_id": "manual__2026-11-14T18:51:34.530726+00:00_shje8dn2",
+        "state": "success",
+        "run_type": "manual",
+        "logical_date": null,
+        "start_date": "2026-11-14T18:51:35.149636Z",
+        "end_date": "2026-11-14T18:53:55.299968Z",
+        "conf": {
+          "model_type": "random_forest"
+        }
+      }
+    },
+    "error": null,
+    "duration_ms": 105.1,
+    "confirmation_token": null
+  }
+}

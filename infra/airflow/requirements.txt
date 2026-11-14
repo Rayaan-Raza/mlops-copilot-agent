@@ -1,4 +1,7 @@
 scikit-learn>=1.4,<2
 pandas>=2.1,<3
-mlflow-skinny>=3.1,<4
+# Same MLflow version as the tracking server (infra/mlflow/Dockerfile).
+mlflow-skinny==3.18.0
+# MLflow 3 serialises sklearn models with skops; mlflow-skinny does not pull it in.
+skops>=0.10
 pyyaml>=6.0

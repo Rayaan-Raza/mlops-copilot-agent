@@ -121,3 +121,13 @@ def test_services_report_endpoints():
     reg, *_ = make()
     svc = call(reg, "k8s_list_services").data["services"][0]
     assert svc["type"] == "ClusterIP" and svc["ready_endpoints"] == 2
+
+
+def test_empty_kubeconfig_env_falls_back_to_default(monkeypatch):
+    """Regression: `KUBECONFIG=` (empty, as in .env.example) broke config loading."""
+    import os
+
+    monkeypatch.setenv("KUBECONFIG", "")
+    assert kubernetes_tools.kubeconfig_path() == os.path.expanduser("~/.kube/config")
+    monkeypatch.setenv("KUBECONFIG", "/tmp/a.yaml" + os.pathsep + "/tmp/b.yaml")
+    assert kubernetes_tools.kubeconfig_path() == "/tmp/a.yaml"

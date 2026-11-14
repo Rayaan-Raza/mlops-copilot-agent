@@ -158,3 +158,10 @@ def test_retraining_policy_requires_evidence():
     )
     assert bad.recommend_retraining and len(bad.reasons) == 2
     assert bad.checks["data_drift"] == "unknown"
+
+
+def test_masked_provider_key_in_error_is_redacted():
+    """Regression (live run): OpenAI 401 errors echo a masked key that ends in real characters."""
+    msg = "Incorrect API key provided: sk-proj-****************wwEA. See docs."
+    out = redact(msg)
+    assert "wwEA" not in out and "sk-proj" not in out and "See docs." in out
