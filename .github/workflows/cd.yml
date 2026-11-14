@@ -1,0 +1,146 @@
+name: CD
+
+# main  -> build & push images to GHCR, deploy to an ephemeral kind "staging" cluster,
+#          run smoke + live agent integration tests against it.
+# v*.*.* tag -> same, plus semver image tags and a GitHub release.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build & push images (GHCR)
+    runs-on: ubuntu-latest
+    outputs:
+      inference_image: ${{ steps.names.outputs.inference }}
+      version: ${{ steps.names.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: names
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "inference=ghcr.io/${repo}/ml-inference" >> "$GITHUB_OUTPUT"
+          echo "agent=ghcr.io/${repo}/mlops-agent" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"; else v="0.0.0-${GITHUB_SHA::7}"; fi
+          echo "version=${v}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta-inf
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.names.outputs.inference }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta-inf.outputs.tags }}
+          labels: ${{ steps.meta-inf.outputs.labels }}
+          build-args: APP_VERSION=${{ steps.names.outputs.version }}
+          cache-from: type=gha,scope=inference
+          cache-to: type=gha,mode=max,scope=inference
+      - id: meta-agent
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.names.outputs.agent }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.agent
+          push: true
+          tags: ${{ steps.meta-agent.outputs.tags }}
+          labels: ${{ steps.meta-agent.outputs.labels }}
+          cache-from: type=gha,scope=agent
+          cache-to: type=gha,mode=max,scope=agent
+
+  deploy-staging:
+    name: Deploy to kind staging + live tests
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: staging
+    env:
+      IMAGE: ${{ needs.build-and-push.outputs.inference_image }}:sha-${{ github.sha }}
+      VERSION: ${{ needs.build-and-push.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: staging
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Load released image into kind
+        run: |
+          docker pull "$IMAGE"
+          kind load docker-image "$IMAGE" --name staging
+      - name: Deploy manifests with the new image and version
+        run: |
+          kubectl apply -k kubernetes
+          kubectl -n mlops-agent patch configmap ml-inference-config --type merge \
+            -p "{\"data\":{\"APP_VERSION\":\"${VERSION}\"}}"
+          kubectl -n mlops-agent set image deployment/ml-inference ml-inference="$IMAGE"
+          kubectl -n mlops-agent label deployment/ml-inference app.kubernetes.io/version="${VERSION}" --overwrite
+          kubectl -n mlops-agent rollout restart deployment/ml-inference
+          kubectl -n mlops-agent rollout status deployment/ml-inference --timeout=180s
+      - name: Smoke test through the ClusterIP service
+        run: |
+          kubectl -n mlops-agent port-forward svc/ml-inference 8080:80 &
+          for i in $(seq 1 30); do curl -sf localhost:8080/health/ready && break; sleep 1; done
+          curl -sf localhost:8080/version | tee version.json
+          grep -q "\"${VERSION}\"" version.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Live agent integration tests (Kubernetes tools against staging)
+        env:
+          RUN_LIVE_K8S_TESTS: "1"
+          K8S_NAMESPACE: mlops-agent
+          K8S_ALLOWED_NAMESPACES: mlops-agent
+        run: |
+          pip install -e ".[tools,dev]"
+          pytest -m integration tests/integration -v
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl -n mlops-agent get all
+          kubectl -n mlops-agent describe pods
+          kubectl -n mlops-agent get events --sort-by=.lastTimestamp
+
+  release:
+    name: GitHub release
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy-staging]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            Images:
+            - `${{ needs.build-and-push.outputs.inference_image }}:${{ needs.build-and-push.outputs.version }}`

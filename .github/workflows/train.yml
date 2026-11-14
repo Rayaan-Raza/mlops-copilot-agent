@@ -1,0 +1,70 @@
+name: Continuous Training
+
+# Re-runs the full training pipeline (validate -> preprocess -> train -> evaluate -> quality gate
+# -> promote) on demand or weekly, and publishes the MLflow store + metrics as artifacts.
+# A failed validation or quality gate fails the workflow and nothing is promoted.
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_type:
+        description: Model type
+        type: choice
+        options: [random_forest, gradient_boosting, logistic_regression]
+        default: random_forest
+      dataset_version:
+        description: Dataset version to build (v1 / v2)
+        type: choice
+        options: [v2, v1]
+        default: v2
+  schedule:
+    - cron: "0 3 * * 1"  # Mondays 03:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    env:
+      MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+      MODEL_TYPE: ${{ inputs.model_type || 'random_forest' }}
+      DATASET_VERSION: ${{ inputs.dataset_version || 'v2' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[ml]"
+      - name: Materialise dataset
+        run: python -m training.make_dataset --version "$DATASET_VERSION"
+      - name: Validate
+        run: python -m training.validate
+      - name: Preprocess
+        run: python -m training.preprocess
+      - name: Train
+        run: python -m training.train --model-type "$MODEL_TYPE"
+      - name: Evaluate
+        run: python -m training.evaluate
+      - name: Quality gate
+        run: python -m training.quality_gate
+      - name: Promote (only reached if the gate passed)
+        run: python -m training.promote
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Training run ($MODEL_TYPE on dataset $DATASET_VERSION)" >> "$GITHUB_STEP_SUMMARY"
+          [ -f reports/metrics.json ] && { echo '```json'; cat reports/metrics.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: training-${{ github.run_id }}
+          path: |
+            mlflow.db
+            mlruns/
+            reports/metrics.json
+            models/run_info.json

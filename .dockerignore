@@ -1,0 +1,17 @@
+.git
+.venv
+venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.env
+.env.*
+mlruns
+mlartifacts
+data
+models
+reports
+infra/airflow/logs
+screenshots
+docs
+*.db
