@@ -111,12 +111,13 @@ def openai_compatible_credentials(provider: str) -> tuple[str | None, str | None
 class OpenAIProvider:
     def __init__(self, model: str, client: Any = None, provider: str = "openai") -> None:
         if client is None:
-            import openai
-
             api_key, base_url = openai_compatible_credentials(provider)
             key_vars = {"groq": "GROQ_API_KEY", "openrouter": "OPENROUTER_API_KEY"}
             if provider in key_vars and not api_key:
                 raise ValueError(f"LLM_PROVIDER={provider} needs {key_vars[provider]} to be set")
+
+            import openai  # after the key check, so a missing key is reported clearly
+
             # OpenRouter's optional attribution headers (shown on openrouter.ai dashboards).
             headers = (
                 {"X-Title": os.getenv("OPENROUTER_APP_NAME", "mlops-copilot-agent")}
