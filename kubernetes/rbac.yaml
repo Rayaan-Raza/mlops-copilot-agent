@@ -1,0 +1,39 @@
+# Least-privilege identity for the MLOps agent, scoped to the mlops-agent namespace only.
+# The agent additionally enforces a namespace allow-list and explicit user confirmation for
+# every state-changing call, so safety is enforced at two independent layers.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mlops-agent
+  namespace: mlops-agent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mlops-agent
+  namespace: mlops-agent
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "endpoints", "events", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  # Only state change allowed: rollout restart / scale (patch) of deployments.
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    verbs: ["patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mlops-agent
+  namespace: mlops-agent
+subjects:
+  - kind: ServiceAccount
+    name: mlops-agent
+    namespace: mlops-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mlops-agent
