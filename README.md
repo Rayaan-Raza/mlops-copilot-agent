@@ -25,7 +25,7 @@ See [architecture.md](architecture.md) for the design and [docs/report.md](docs/
 | Docker Desktop | runs MLflow and Airflow (docker compose) and builds images |
 | Kubernetes | **Docker Desktop → Settings → Kubernetes → Enable** (simplest), or `kind` |
 | git | DVC provenance reads git tags |
-| An LLM API key | Anthropic, or any OpenAI-compatible provider (OpenAI, Groq, Gemini, Ollama) |
+| An LLM API key | OpenRouter (recommended: one key, many models), Anthropic, OpenAI, Groq, or another OpenAI-compatible provider |
 
 ## 2. Install
 
@@ -42,11 +42,49 @@ Key settings in `.env`:
 
 | Variable | Purpose |
 |---|---|
-| `LLM_PROVIDER`, `LLM_MODEL`, `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`) / `GROQ_API_KEY` | LLM used for tool calling |
+| `LLM_PROVIDER`, `LLM_MODEL`, plus the provider's key | LLM used for tool calling (see [Choosing an LLM provider](#choosing-an-llm-provider)) |
 | `MLFLOW_TRACKING_URI` | `http://localhost:5000` |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USERNAME`, `AIRFLOW_PASSWORD`, `AIRFLOW_ALLOWED_DAGS` | Airflow 3 API and the DAGs the agent may trigger |
 | `K8S_NAMESPACE`, `K8S_ALLOWED_NAMESPACES` | namespaces the agent may read and modify |
 | `RETRAIN_FRESHNESS_DAYS`, `RETRAIN_MIN_F1` | retraining policy |
+
+### Choosing an LLM provider
+
+The agent needs a model that supports tool (function) calling. Set these in `.env`:
+
+| Provider | `LLM_PROVIDER` | Key variable | Example `LLM_MODEL` | Endpoint |
+|---|---|---|---|---|
+| **OpenRouter** (recommended) | `openrouter` | `OPENROUTER_API_KEY` | `openai/gpt-4.1-mini` | set automatically |
+| Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | `claude-sonnet-5-5` | set automatically |
+| OpenAI | `openai` | `OPENAI_API_KEY` | `gpt-4.1-mini` | set automatically |
+| Groq | `groq` | `GROQ_API_KEY` | `openai/gpt-oss-120b` | set automatically |
+| Other OpenAI-compatible (Gemini, Ollama, …) | `openai` | `OPENAI_API_KEY` | provider's model id | `OPENAI_BASE_URL` |
+
+**Using OpenRouter:**
+
+1. Create a key at <https://openrouter.ai/keys> and add a little credit (the agent uses well under a cent per question with `gpt-4.1-mini`).
+2. Put these lines in `.env`:
+   ```dotenv
+   LLM_PROVIDER=openrouter
+   LLM_MODEL=openai/gpt-4.1-mini
+   OPENROUTER_API_KEY=sk-or-v1-...
+   ```
+3. Check that it is picked up:
+   ```bash
+   python -c "from agent.config import Settings; s=Settings(); print(s.llm_provider, s.llm_model)"
+   ```
+
+Any model id from <https://openrouter.ai/models> works if it supports tools, for example `anthropic/claude-sonnet-4.5` or `google/gemini-2.5-flash`.
+
+| OpenRouter error | Fix |
+|---|---|
+| `402 … requires more credits, or fewer max_tokens` | Lower `LLM_MAX_TOKENS` (default 4096), or add credit |
+| `401` | Wrong or revoked `OPENROUTER_API_KEY` |
+| `404 … No endpoints found that support tool use` | Pick a model that supports tool calling |
+
+> **Why OpenRouter has its own variable:** `.env` never overrides variables already set in your shell.
+> If an old `OPENAI_API_KEY` is exported system-wide, putting the OpenRouter key in `OPENAI_API_KEY` would be silently ignored.
+> With `OPENROUTER_API_KEY` there is no clash. A shell `OPENAI_API_KEY` is never sent to OpenRouter, and the OpenRouter key is never sent to OpenAI.
 
 ## 3. Launch each service
 
@@ -105,9 +143,7 @@ kubectl -n mlops-agent port-forward svc/ml-inference 8000:80   # then GET http:/
 ### 3.4 The agent
 
 > **Windows:** set `PYTHONUTF8=1`, because MLflow prints emoji that the default console encoding cannot render.
-> With an OpenAI key, set `LLM_PROVIDER=openai` and an OpenAI model in `.env`, for example `LLM_MODEL=gpt-4.1-mini`.
-> With a Groq key, set `LLM_PROVIDER=groq`, `GROQ_API_KEY` and a Groq model, for example `LLM_MODEL=openai/gpt-oss-120b`.
-> With OpenRouter, set `LLM_PROVIDER=openai`, `OPENAI_BASE_URL=https://openrouter.ai/api/v1`, `OPENAI_API_KEY` and a model such as `LLM_MODEL=openai/gpt-4.1-mini`. Lower `LLM_MAX_TOKENS` (default 4096) if the account has few credits.
+> The LLM is configured in `.env`; see [Choosing an LLM provider](#choosing-an-llm-provider).
 > Recorded runs and their write-ups are in [docs/conversations](docs/conversations/README.md).
 
 ```bash

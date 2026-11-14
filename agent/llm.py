@@ -88,31 +88,48 @@ class AnthropicProvider:
 
 # --------------------------------------------------------------------------- OpenAI-compatible
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 def openai_compatible_credentials(provider: str) -> tuple[str | None, str | None]:
     """(api_key, base_url) for an OpenAI-compatible provider.
 
-    For ``groq`` only the Groq key and endpoint are used, so an unrelated ``OPENAI_API_KEY`` in
-    the shell environment is never sent to Groq (or a Groq key to OpenAI).
+    ``groq`` and ``openrouter`` read only their own key and endpoint, so an unrelated
+    ``OPENAI_API_KEY`` exported in the shell (which python-dotenv will not override) is never
+    sent to them, and their keys are never sent to OpenAI.
     """
     if provider == "groq":
         key = os.getenv("GROQ_API_KEY") or os.getenv("GROQ_KEY")
         return key, os.getenv("GROQ_BASE_URL") or GROQ_BASE_URL
+    if provider == "openrouter":
+        return os.getenv("OPENROUTER_API_KEY"), os.getenv("OPENROUTER_BASE_URL") or (
+            OPENROUTER_BASE_URL
+        )
     return os.getenv("OPENAI_API_KEY"), os.getenv("OPENAI_BASE_URL") or None
 
 
 class OpenAIProvider:
     def __init__(self, model: str, client: Any = None, provider: str = "openai") -> None:
         if client is None:
-            import openai
-
             api_key, base_url = openai_compatible_credentials(provider)
+            key_vars = {"groq": "GROQ_API_KEY", "openrouter": "OPENROUTER_API_KEY"}
+            if provider in key_vars and not api_key:
+                raise ValueError(f"LLM_PROVIDER={provider} needs {key_vars[provider]} to be set")
+
+            import openai  # after the key check, so a missing key is reported clearly
+
+            # OpenRouter's optional attribution headers (shown on openrouter.ai dashboards).
+            headers = (
+                {"X-Title": os.getenv("OPENROUTER_APP_NAME", "mlops-copilot-agent")}
+                if provider == "openrouter"
+                else None
+            )
             # Free tiers (e.g. Groq) rate-limit per minute; the SDK honours `retry-after` on 429.
             client = openai.OpenAI(
                 api_key=api_key,
                 base_url=base_url,
                 max_retries=int(os.getenv("LLM_MAX_RETRIES", "6")),
+                default_headers=headers,
             )
         self.client, self.model = client, model
 
@@ -191,6 +208,8 @@ def build_provider(provider: str, model: str) -> LLMProvider:
     provider = provider.lower()
     if provider == "anthropic":
         return AnthropicProvider(model)
-    if provider in ("openai", "groq", "gemini", "ollama"):
+    if provider in ("openai", "openrouter", "groq", "gemini", "ollama"):
         return OpenAIProvider(model, provider=provider)
-    raise ValueError(f"unknown LLM_PROVIDER {provider!r} (expected anthropic, openai or groq)")
+    raise ValueError(
+        f"unknown LLM_PROVIDER {provider!r} (expected anthropic, openai, openrouter or groq)"
+    )
