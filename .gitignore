@@ -38,3 +38,4 @@ infra/airflow/config/
 .idea/
 .DS_Store
 Thumbs.db
+/dvc-remote/
