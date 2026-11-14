@@ -16,9 +16,10 @@ from sklearn.model_selection import train_test_split
 
 from training import make_dataset
 from training.config import load_params
-from training.train import build_model
+from training.models import build_model
 
 DATASET_VERSION = "v2"
+DATASET_TAG = "data-v2.0"
 
 
 def main(out_dir: str = "models") -> None:
@@ -36,7 +37,7 @@ def main(out_dir: str = "models") -> None:
     (out / "model.pkl").write_bytes(blob)
     meta = {
         "model_type": tcfg["model_type"],
-        "dataset_version": DATASET_VERSION,
+        "dataset_version": DATASET_TAG,
         "test_f1": round(float(f1_score(y_te, model.predict(x_te))), 4),
         "sha256": hashlib.sha256(blob).hexdigest()[:12],
         "feature_names": list(x.columns),
