@@ -165,3 +165,14 @@ def test_masked_provider_key_in_error_is_redacted():
     msg = "Incorrect API key provided: sk-proj-****************wwEA. See docs."
     out = redact(msg)
     assert "wwEA" not in out and "sk-proj" not in out and "See docs." in out
+
+
+def test_groq_provider_uses_groq_key_and_endpoint(monkeypatch):
+    """Groq must not receive an unrelated OPENAI_API_KEY from the shell environment."""
+    from agent.llm import GROQ_BASE_URL, openai_compatible_credentials
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-test")
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("GROQ_KEY", "gsk_test")
+    assert openai_compatible_credentials("groq") == ("gsk_test", GROQ_BASE_URL)
+    assert openai_compatible_credentials("openai")[0] == "sk-openai-test"
