@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-inference-config
+  namespace: mlops-agent
+  labels:
+    app: ml-inference
+    app.kubernetes.io/part-of: mlops-copilot
+data:
+  # Non-sensitive configuration only. Secrets never go in a ConfigMap.
+  APP_VERSION: "1.0.0"
+  MODEL_NAME: "breast-cancer-classifier"
+  MODEL_PATH: "/app/models/model.pkl"
+  PREDICTION_THRESHOLD: "0.5"
+  LOG_LEVEL: "INFO"
+  # Set to "true" to inject a startup failure (CrashLoopBackOff demo).
+  SIMULATE_STARTUP_FAILURE: "false"
