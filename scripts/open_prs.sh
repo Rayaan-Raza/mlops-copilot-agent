@@ -33,9 +33,7 @@ for entry in "${BRANCHES[@]}"; do
 
 Use **Create a merge commit** (not squash/rebase) so the \`data-v*\` dataset tags stay reachable from \`main\`.
 
-Commits: see the commit list for details.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+Commits: see the commit list for details."
   url=$(gh pr create --repo "$REPO" --base main --head "$branch" --title "$title" --body "$body")
   echo "[$n] $url"
 done
