@@ -104,6 +104,9 @@ kubectl -n mlops-agent port-forward svc/ml-inference 8000:80   # then GET http:/
 
 ### 3.4 The agent
 
+> **Windows:** set `PYTHONUTF8=1`, because MLflow prints emoji that the default console encoding cannot render.
+> With an OpenAI key, set `LLM_PROVIDER=openai` and an OpenAI model in `.env`, for example `LLM_MODEL=gpt-4.1-mini`.
+
 ```bash
 # CLI (asks y/n before any state-changing action)
 mlops-agent "Find the best recent model, identify the dataset version used to train it, check the deployment status, and explain whether retraining is necessary."

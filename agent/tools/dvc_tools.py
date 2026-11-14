@@ -8,8 +8,11 @@ timeout. Version provenance is read from ``*.dvc`` pointer files at a given git 
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
 import subprocess
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -61,6 +64,30 @@ def _validate_path(path: str) -> str:
     return p.as_posix()
 
 
+SKIP_DIRS = {".dvc", ".git", ".venv", "venv", "node_modules", "__pycache__", "dvc-remote"}
+
+
+def resolve_executable(name: str) -> str:
+    """Find ``dvc``/``git`` on PATH, or next to the running interpreter (an inactive venv)."""
+    found = shutil.which(name)
+    if found:
+        return found
+    for candidate in (name, f"{name}.exe"):
+        local = Path(sys.executable).parent / candidate
+        if local.is_file():
+            return str(local)
+    return name
+
+
+def find_dvc_pointers(root: Path) -> list[Path]:
+    """All ``*.dvc`` pointer *files* under root, skipping VCS/env/cache directories."""
+    pointers = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
+        pointers += [Path(dirpath) / f for f in sorted(filenames) if f.endswith(".dvc")]
+    return pointers
+
+
 class DVCClient:
     def __init__(
         self,
@@ -85,7 +112,7 @@ class DVCClient:
             )
         try:
             proc = self._runner(
-                cmd,
+                [resolve_executable(cmd[0]), *cmd[1:]],
                 cwd=self.repo_root,
                 capture_output=True,
                 text=True,
@@ -189,9 +216,7 @@ def build_tools(client: DVCClient) -> list[Tool]:
     def list_tracked_datasets(_: BaseModel) -> dict:
         root = client.repo_root
         tracked = []
-        for f in sorted(root.rglob("*.dvc")):
-            if ".dvc" in f.relative_to(root).parts[:-1] or ".venv" in f.parts:
-                continue
+        for f in find_dvc_pointers(root):
             meta = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
             for out in meta.get("outs", []):
                 rel = (f.parent.relative_to(root) / out.get("path", "")).as_posix()
@@ -308,12 +333,27 @@ def build_tools(client: DVCClient) -> list[Tool]:
             status = json.loads(raw) if raw.strip() else {}
         except json.JSONDecodeError:
             status = {"raw": raw[:2000]}
+        # Separate versioned *data* (``*.dvc`` pointers) from pipeline *stages* (dvc.yaml), so a
+        # pipeline that was never run/locked is not mistaken for drift in the dataset itself.
+        data_changes = {k: v for k, v in status.items() if k.endswith(".dvc")}
+        stage_changes = {k: v for k, v in status.items() if not k.endswith(".dvc")}
         return {
             "workspace_in_sync": status == {},
-            "changed": status,
-            "interpretation": "tracked data and pipeline outputs match dvc.lock / .dvc pointers"
-            if status == {}
-            else "some tracked data or stage outputs differ from their recorded hashes",
+            "tracked_data_changed": bool(data_changes),
+            "data_changes": data_changes,
+            "pipeline_stages_out_of_date": sorted(stage_changes),
+            "pipeline_details": stage_changes,
+            "interpretation": (
+                "tracked datasets match their recorded DVC hashes"
+                if not data_changes
+                else "a DVC-tracked dataset differs from its recorded hash (unversioned change)"
+            )
+            + (
+                "; pipeline stages are out of date or not yet recorded in dvc.lock "
+                "(this alone is not a data change)"
+                if stage_changes
+                else ""
+            ),
         }
 
     def reproduction_steps(a: VersionArgs) -> dict:

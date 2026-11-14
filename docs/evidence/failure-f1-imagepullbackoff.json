@@ -1,0 +1,124 @@
+{
+  "k8s_diagnose_deployment": {
+    "tool": "k8s_diagnose_deployment",
+    "call_id": "k8s_diagnose_deployment",
+    "status": "ok",
+    "data": {
+      "deployment": {
+        "name": "ml-inference",
+        "desired_replicas": 2,
+        "ready_replicas": 2,
+        "available_replicas": 2,
+        "updated_replicas": 1,
+        "images": [
+          "ml-inference:9.9.9"
+        ],
+        "version_label": "1.0.0",
+        "revision": "2",
+        "conditions": [
+          {
+            "type": "Available",
+            "status": "True",
+            "reason": "MinimumReplicasAvailable",
+            "message": "Deployment has minimum availability."
+          },
+          {
+            "type": "Progressing",
+            "status": "True",
+            "reason": "ReplicaSetUpdated",
+            "message": "ReplicaSet \"ml-inference-6f9cbf6669\" is progressing."
+          }
+        ]
+      },
+      "service_endpoints": [
+        {
+          "name": "ml-inference",
+          "type": "ClusterIP",
+          "cluster_ip": "10.96.134.43",
+          "ports": [
+            {
+              "port": 80,
+              "target_port": "http",
+              "protocol": "TCP"
+            }
+          ],
+          "selector": {
+            "app": "ml-inference"
+          },
+          "ready_endpoints": 2,
+          "not_ready_endpoints": 1
+        }
+      ],
+      "unhealthy_pods": [
+        {
+          "pod": "ml-inference-6f9cbf6669-8mkfs",
+          "issues": [
+            "phase is Pending",
+            "not Ready (readiness probe failing or container not started)",
+            "container ml-inference waiting: ImagePullBackOff Back-off pulling image \"ml-inference:9.9.9\": ErrImagePull: failed to pull and unpack image \"docker.io/library/ml-inference:9.9.9\": failed to resolve reference \"docker.io/library/ml-inference:9.9.9\": pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed"
+          ],
+          "restarts": 0
+        }
+      ],
+      "warning_events": [
+        {
+          "type": "Warning",
+          "reason": "Failed",
+          "object": "Pod/ml-inference-6f9cbf6669-8mkfs",
+          "message": "Failed to pull image \"ml-inference:9.9.9\": failed to pull and unpack image \"docker.io/library/ml-inference:9.9.9\": failed to resolve reference \"docker.io/library/ml-inference:9.9.9\": pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed",
+          "count": 3,
+          "last_seen": "2026-11-14T18:58:48+00:00"
+        },
+        {
+          "type": "Warning",
+          "reason": "Failed",
+          "object": "Pod/ml-inference-6f9cbf6669-8mkfs",
+          "message": "Error: ErrImagePull",
+          "count": 3,
+          "last_seen": "2026-11-14T18:58:48+00:00"
+        },
+        {
+          "type": "Warning",
+          "reason": "Failed",
+          "object": "Pod/ml-inference-6f9cbf6669-8mkfs",
+          "message": "Error: ImagePullBackOff",
+          "count": 2,
+          "last_seen": "2026-11-14T18:58:32+00:00"
+        }
+      ],
+      "logs": [
+        {
+          "pod": "ml-inference-6f9cbf6669-8mkfs",
+          "log_error": "Kubernetes API error 400: Bad Request"
+        }
+      ],
+      "api_reachable_via_service": true
+    },
+    "error": null,
+    "duration_ms": 4532.61,
+    "confirmation_token": null
+  },
+  "k8s_get_deployed_version": {
+    "tool": "k8s_get_deployed_version",
+    "call_id": "k8s_get_deployed_version",
+    "status": "ok",
+    "data": {
+      "deployment": "ml-inference",
+      "namespace": "mlops-agent",
+      "image_tags": [
+        "9.9.9"
+      ],
+      "images": [
+        "ml-inference:9.9.9"
+      ],
+      "version_label": "1.0.0",
+      "configmap_app_version": "1.0.0",
+      "revision": "2",
+      "version_sources_consistent": false,
+      "ready_replicas": "2/2"
+    },
+    "error": null,
+    "duration_ms": 24.9,
+    "confirmation_token": null
+  }
+}

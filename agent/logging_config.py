@@ -18,7 +18,7 @@ SECRET_KEY_RE = re.compile(
 REDACTED = "***REDACTED***"
 SECRET_VALUE_RES = [
     (re.compile(r"(Bearer\s+)[A-Za-z0-9\-._~+/]+=*", re.I), r"\1" + REDACTED),
-    (re.compile(r"\bsk-[A-Za-z0-9_\-]{8,}"), REDACTED),  # API keys
+    (re.compile(r"\bsk-[A-Za-z0-9_\-*]{4,}"), REDACTED),  # API keys, incl. provider-masked
     (re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+"), REDACTED),  # JWT
     (re.compile(r"((?:password|token|api_key|secret)\s*[=:]\s*)\S+", re.I), r"\1" + REDACTED),
 ]

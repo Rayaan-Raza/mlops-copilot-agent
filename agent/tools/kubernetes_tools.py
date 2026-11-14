@@ -7,6 +7,7 @@ agent's service account to the same namespace.
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -41,6 +42,18 @@ def _iso(dt) -> str | None:
     return dt.isoformat() if isinstance(dt, datetime) else (str(dt) if dt else None)
 
 
+def kubeconfig_path() -> str:
+    """``$KUBECONFIG`` if set to something, else ``~/.kube/config``.
+
+    An empty ``KUBECONFIG=`` (as in .env.example) must not be treated as a path: the kubernetes
+    client would otherwise fail with "Invalid kube-config file".
+    """
+    value = (os.environ.get("KUBECONFIG") or "").strip()
+    if value:
+        return value.split(os.pathsep)[0]
+    return os.path.expanduser("~/.kube/config")
+
+
 class KubeGateway:
     """Lazily builds kubernetes API clients; tests inject fakes via ``core``/``apps``."""
 
@@ -56,7 +69,7 @@ class KubeGateway:
             try:
                 config.load_incluster_config()
             except config.ConfigException:
-                config.load_kube_config()
+                config.load_kube_config(config_file=kubeconfig_path())
         except Exception as exc:  # noqa: BLE001
             raise ServiceUnavailableError(f"no usable kubeconfig: {exc}") from exc
         self._core = self._core or client.CoreV1Api()

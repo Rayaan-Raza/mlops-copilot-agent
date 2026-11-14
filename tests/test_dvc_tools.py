@@ -3,6 +3,7 @@
 import json
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -47,7 +48,7 @@ def fake_runner(dvc_outputs: dict):
     """Run git for real; answer dvc sub-commands from a dict."""
 
     def run(cmd, **kwargs):
-        if cmd[0] == "dvc":
+        if Path(cmd[0]).stem.lower() == "dvc":  # executable may be resolved to a full path
             out = dvc_outputs.get(cmd[1], "{}")
             return subprocess.CompletedProcess(cmd, 0, stdout=out, stderr="")
         return subprocess.run(cmd, **kwargs)
@@ -116,8 +117,21 @@ def test_data_status_reports_changes(repo):
     )
     res = call(make(repo, {"status": changed}), "dvc_check_data_status")
     assert res.data["workspace_in_sync"] is False
+    assert res.data["tracked_data_changed"] is True
     clean = call(make(repo, {"status": "{}"}), "dvc_check_data_status")
     assert clean.data["workspace_in_sync"] is True
+    assert clean.data["tracked_data_changed"] is False
+
+
+def test_unrun_pipeline_is_not_reported_as_data_change(repo):
+    """Regression (live run): stages missing from dvc.lock looked like dataset drift."""
+    stages_only = json.dumps(
+        {"train": [{"changed deps": {"params.yaml": "new"}}], "evaluate": [{"changed outs": {}}]}
+    )
+    res = call(make(repo, {"status": stages_only}), "dvc_check_data_status")
+    assert res.data["tracked_data_changed"] is False
+    assert res.data["pipeline_stages_out_of_date"] == ["evaluate", "train"]
+    assert "not a data change" in res.data["interpretation"]
 
 
 def test_option_injection_in_revision_is_rejected(repo):
@@ -142,3 +156,25 @@ def test_missing_dvc_binary_is_unavailable(repo):
     dvc_tools.register(reg, Settings(repo_root=repo), DVCClient(repo, runner=runner))
     res = call(reg, "dvc_check_data_status")
     assert res.status == ToolStatus.UNAVAILABLE
+
+
+def test_list_tracked_skips_dvc_dir_and_envs(repo):
+    """Regression (live run on Windows): the `.dvc/` folder itself matched `*.dvc`."""
+    (repo / ".dvc" / "cache").mkdir(parents=True)
+    (repo / ".venv" / "lib").mkdir(parents=True)
+    (repo / ".venv" / "lib" / "junk.dvc").write_text("outs: []", encoding="utf-8")
+    res = call(make(repo), "dvc_list_tracked_datasets")
+    assert res.status == ToolStatus.OK, res.error
+    assert [t["path"] for t in res.data["tracked"]] == ["data/raw/dataset.csv"]
+
+
+def test_dvc_executable_resolved_next_to_interpreter(tmp_path, monkeypatch):
+    """Regression: `dvc` lives in the venv's Scripts/bin, which may not be on PATH."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    exe = fake_bin / "dvc.exe"
+    exe.write_text("", encoding="utf-8")
+    monkeypatch.setattr(dvc_tools.shutil, "which", lambda name: None)
+    monkeypatch.setattr(dvc_tools.sys, "executable", str(fake_bin / "python.exe"))
+    assert dvc_tools.resolve_executable("dvc") == str(exe)
+    assert dvc_tools.resolve_executable("nonexistent-tool") == "nonexistent-tool"
