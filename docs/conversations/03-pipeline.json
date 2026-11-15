@@ -1,0 +1,87 @@
+{
+  "scenario": "pipeline execution (multi-turn, with human confirmation)",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Trigger the model training pipeline and report whether execution succeeded."
+    },
+    {
+      "role": "agent",
+      "response": {
+        "request_id": "864d402b28c0",
+        "answer": "Triggering the model training pipeline requires your confirmation. Please provide the following confirmation token so I can proceed: HQUw-AZ92j22kVV6srNnBQ",
+        "facts": [],
+        "uncertainties": [],
+        "recommendations": [],
+        "evidence": [
+          {
+            "tool": "airflow_trigger_dag",
+            "call_id": "call_lelATz2wEo9MXwiamLBnmLbx",
+            "status": "confirmation_required"
+          }
+        ],
+        "pending_confirmations": [
+          {
+            "tool": "airflow_trigger_dag",
+            "action": "Trigger Airflow DAG 'training_pipeline' with conf {}",
+            "confirmation_token": "HQUw-AZ92j22kVV6srNnBQ"
+          }
+        ],
+        "steps": 2
+      }
+    },
+    {
+      "role": "human_confirmation",
+      "action": "Trigger Airflow DAG 'training_pipeline' with conf {}",
+      "decision": "yes",
+      "result": {
+        "tool": "airflow_trigger_dag",
+        "call_id": "confirm-36043fa3",
+        "status": "ok",
+        "data": {
+          "triggered": true,
+          "dag_run_id": "manual__2026-11-15T07:55:33.140536+00:00_hpHJ4bi0",
+          "state": "queued",
+          "run_type": "manual",
+          "logical_date": null,
+          "start_date": null,
+          "end_date": null,
+          "conf": {}
+        },
+        "error": null,
+        "duration_ms": 1393.2,
+        "confirmation_token": null
+      }
+    },
+    {
+      "role": "user",
+      "content": "I confirmed the trigger. The new training_pipeline run is manual__2026-11-15T07:55:33.140536+00:00_hpHJ4bi0. Wait for it to finish and report whether execution succeeded, including the state of every task."
+    },
+    {
+      "role": "agent",
+      "response": {
+        "request_id": "ae40b89c9c84",
+        "answer": "## Summary\nThe manually triggered training_pipeline run manual__2026-11-15T07:55:33.140536+00:00_hpHJ4bi0 finished successfully. Every task in the pipeline completed with a success state.\n\n## Facts\n- The DAG run manual__2026-11-15T07:55:33.140536+00:00_hpHJ4bi0 finished with state \"success\" [evidence: call_EnUV7xPTjPwo9l5X2RvlAs3L].\n- Each task in the run (validate_dataset, preprocess_data, train_model, evaluate_and_log_mlflow, apply_quality_gate, promote_model) completed successfully [evidence: call_EnUV7xPTjPwo9l5X2RvlAs3L].\n\n## Uncertainties\n- None.\n\n## Recommended actions\n- Review the new model's evaluation metrics and quality gate results to decide on deployment or further testing.",
+        "facts": [
+          "The DAG run manual__2026-11-15T07:55:33.140536+00:00_hpHJ4bi0 finished with state \"success\" [evidence: call_EnUV7xPTjPwo9l5X2RvlAs3L].",
+          "Each task in the run (validate_dataset, preprocess_data, train_model, evaluate_and_log_mlflow, apply_quality_gate, promote_model) completed successfully [evidence: call_EnUV7xPTjPwo9l5X2RvlAs3L]."
+        ],
+        "uncertainties": [
+          "None."
+        ],
+        "recommendations": [
+          "Review the new model's evaluation metrics and quality gate results to decide on deployment or further testing."
+        ],
+        "evidence": [
+          {
+            "tool": "airflow_wait_for_dag_run",
+            "call_id": "call_EnUV7xPTjPwo9l5X2RvlAs3L",
+            "status": "ok"
+          }
+        ],
+        "pending_confirmations": [],
+        "steps": 2
+      }
+    }
+  ]
+}

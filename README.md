@@ -168,7 +168,7 @@ Every `/chat` response contains:
 ## 4. Tests
 
 ```bash
-pytest -m "not integration"        # 59 tests, all external services mocked
+pytest -m "not integration"        # 68 tests, all external services mocked
 ruff check . && ruff format --check .
 # live checks against your current kube context:
 RUN_LIVE_K8S_TESTS=1 pytest -m integration tests/integration

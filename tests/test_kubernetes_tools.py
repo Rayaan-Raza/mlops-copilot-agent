@@ -131,3 +131,13 @@ def test_empty_kubeconfig_env_falls_back_to_default(monkeypatch):
     assert kubernetes_tools.kubeconfig_path() == os.path.expanduser("~/.kube/config")
     monkeypatch.setenv("KUBECONFIG", "/tmp/a.yaml" + os.pathsep + "/tmp/b.yaml")
     assert kubernetes_tools.kubeconfig_path() == "/tmp/a.yaml"
+
+
+def test_deployed_version_reports_what_the_service_actually_serves():
+    """Regression (live run): the agent claimed the best MLflow run was deployed, but the
+    service was serving a different model. The tool now reads /version via the API proxy."""
+    reg, *_ = make()
+    serving = call(reg, "k8s_get_deployed_version").data["serving_model"]
+    assert serving["available"] is True
+    assert serving["model_type"] == "random_forest" and serving["test_f1"] == 0.951
+    assert "feature_names" not in serving
