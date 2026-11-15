@@ -7,6 +7,7 @@ agent's service account to the same namespace.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from datetime import datetime, timezone
@@ -317,6 +318,29 @@ def build_tools(kube: KubeGateway, settings: Settings) -> list[Tool]:
             "healthy": not flagged and bool(pods["pods"]),
         }
 
+    def serving_model(service: str, namespace: str) -> dict:
+        """Ask the running service what it serves (GET /version via the API-server proxy).
+
+        Read-only; needs ``services/proxy: get`` in the namespace. Any failure is reported in
+        the result rather than raised, because the rest of the version check is still useful.
+        """
+        try:
+            raw = kube.call(
+                kube.core.connect_get_namespaced_service_proxy_with_path,
+                f"{service}:http",
+                namespace,
+                "version",
+                # Raw bytes: with preloading the client returns a Python repr, not JSON.
+                _preload_content=False,
+            )
+            raw = raw.data.decode("utf-8") if hasattr(raw, "data") else raw
+            body = json.loads(raw) if isinstance(raw, str) else raw
+            model = dict(body.get("model") or {})
+            model.pop("feature_names", None)  # long and not useful to the LLM
+            return {"available": True, "app_version": body.get("app_version"), **model}
+        except Exception as exc:  # noqa: BLE001
+            return {"available": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
+
     def deployed_version(a: DeploymentArgs) -> dict:
         n = ns(a.namespace)
         d = deployment_summary(kube.call(kube.apps.read_namespaced_deployment, a.deployment, n))
@@ -327,7 +351,13 @@ def build_tools(kube: KubeGateway, settings: Settings) -> list[Tool]:
             cfg_version = None
         tags = [img.rsplit(":", 1)[-1] if ":" in img else "latest" for img in d["images"]]
         consistent = len({v for v in [d["version_label"], cfg_version, *tags] if v}) <= 1
+        serving = serving_model(a.deployment, n)
         return {
+            "serving_model": serving,
+            "model_link_note": (
+                "The service identifies its model only by type, dataset, test F1 and hash, not by "
+                "MLflow run id. Compare these with MLflow before claiming a specific run is deployed."
+            ),
             "deployment": a.deployment,
             "namespace": n,
             "image_tags": tags,

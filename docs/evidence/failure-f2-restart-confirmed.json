@@ -1,0 +1,27 @@
+{
+  "restart_request": {
+    "tool": "k8s_restart_deployment",
+    "call_id": "r",
+    "status": "confirmation_required",
+    "data": {
+      "action": "Rolling restart of deployment/ml-inference in namespace mlops-agent",
+      "message": "Not executed. A human must confirm this action."
+    },
+    "error": null,
+    "duration_ms": 0.57,
+    "confirmation_token": "vf0N1NnWZ9J-m0pdk--m4A"
+  },
+  "restart_confirmed": {
+    "tool": "k8s_restart_deployment",
+    "call_id": "confirm-2fbd1ca4",
+    "status": "ok",
+    "data": {
+      "restarted": "ml-inference",
+      "namespace": "mlops-agent",
+      "restarted_at": "2026-11-15T07:59:01.621514+00:00"
+    },
+    "error": null,
+    "duration_ms": 2503.9,
+    "confirmation_token": null
+  }
+}

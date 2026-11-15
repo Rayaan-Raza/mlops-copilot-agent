@@ -1,0 +1,151 @@
+{
+  "k8s_diagnose_deployment": {
+    "tool": "k8s_diagnose_deployment",
+    "call_id": "k8s_diagnose_deployment",
+    "status": "ok",
+    "data": {
+      "deployment": {
+        "name": "ml-inference",
+        "desired_replicas": 2,
+        "ready_replicas": 2,
+        "available_replicas": 2,
+        "updated_replicas": 2,
+        "images": [
+          "ml-inference:1.0.0"
+        ],
+        "version_label": "1.0.0",
+        "revision": "4",
+        "conditions": [
+          {
+            "type": "Available",
+            "status": "True",
+            "reason": "MinimumReplicasAvailable",
+            "message": "Deployment has minimum availability."
+          },
+          {
+            "type": "Progressing",
+            "status": "True",
+            "reason": "NewReplicaSetAvailable",
+            "message": "ReplicaSet \"ml-inference-79d884ff78\" has successfully progressed."
+          }
+        ]
+      },
+      "service_endpoints": [
+        {
+          "name": "ml-inference",
+          "type": "ClusterIP",
+          "cluster_ip": "10.96.134.43",
+          "ports": [
+            {
+              "port": 80,
+              "target_port": "http",
+              "protocol": "TCP"
+            }
+          ],
+          "selector": {
+            "app": "ml-inference"
+          },
+          "ready_endpoints": 2,
+          "not_ready_endpoints": 0
+        }
+      ],
+      "unhealthy_pods": [],
+      "warning_events": [
+        {
+          "type": "Warning",
+          "reason": "BackOff",
+          "object": "Pod/ml-inference-7764896c69-nkzlp",
+          "message": "Back-off restarting failed container ml-inference in pod ml-inference-7764896c69-nkzlp_mlops-agent(af650658-523d-478c-b5d6-762445aacaf4)",
+          "count": 10,
+          "last_seen": "2026-11-15T07:58:58+00:00"
+        },
+        {
+          "type": "Warning",
+          "reason": "BackOff",
+          "object": "Pod/ml-inference-7764896c69-bxjgv",
+          "message": "Back-off restarting failed container ml-inference in pod ml-inference-7764896c69-bxjgv_mlops-agent(a78e3d28-37d8-44ca-8594-f01098b1b69f)",
+          "count": 10,
+          "last_seen": "2026-11-15T07:58:53+00:00"
+        },
+        {
+          "type": "Warning",
+          "reason": "Unhealthy",
+          "object": "Pod/ml-inference-7764896c69-bxjgv",
+          "message": "Readiness probe failed: Get \"http://10.244.0.7:8000/health/ready\": dial tcp 10.244.0.7:8000: connect: connection refused",
+          "count": 2,
+          "last_seen": "2026-11-15T07:57:09+00:00"
+        },
+        {
+          "type": "Warning",
+          "reason": "Unhealthy",
+          "object": "Pod/ml-inference-7764896c69-nkzlp",
+          "message": "Readiness probe failed: Get \"http://10.244.0.8:8000/health/ready\": dial tcp 10.244.0.8:8000: connect: connection refused",
+          "count": 2,
+          "last_seen": "2026-11-15T07:57:09+00:00"
+        },
+        {
+          "type": "Warning",
+          "reason": "Unhealthy",
+          "object": "Pod/ml-inference-7764896c69-bg8vc",
+          "message": "Readiness probe failed: Get \"http://10.244.0.3:8000/health/ready\": dial tcp 10.244.0.3:8000: connect: connection refused",
+          "count": 4,
+          "last_seen": "2026-11-15T07:56:47+00:00"
+        },
+        {
+          "type": "Warning",
+          "reason": "Unhealthy",
+          "object": "Pod/ml-inference-7764896c69-m7frm",
+          "message": "Readiness probe failed: Get \"http://10.244.0.2:8000/health/ready\": dial tcp 10.244.0.2:8000: connect: connection refused",
+          "count": 2,
+          "last_seen": "2026-11-15T07:56:46+00:00"
+        },
+        {
+          "type": "Warning",
+          "reason": "Unhealthy",
+          "object": "Pod/ml-inference-7764896c69-bg8vc",
+          "message": "Liveness probe failed: Get \"http://10.244.0.3:8000/health/live\": dial tcp 10.244.0.3:8000: connect: connection refused",
+          "count": 1,
+          "last_seen": "2026-11-15T07:50:35+00:00"
+        }
+      ],
+      "logs": [],
+      "api_reachable_via_service": true
+    },
+    "error": null,
+    "duration_ms": 2400.94,
+    "confirmation_token": null
+  },
+  "k8s_get_deployed_version": {
+    "tool": "k8s_get_deployed_version",
+    "call_id": "k8s_get_deployed_version",
+    "status": "ok",
+    "data": {
+      "serving_model": {
+        "available": true,
+        "app_version": "1.0.0",
+        "model_type": "random_forest",
+        "dataset_version": "v2",
+        "test_f1": 0.951,
+        "sha256": "115b5b3290e7",
+        "source": "/app/models/model.pkl"
+      },
+      "model_link_note": "The service identifies its model only by type, dataset, test F1 and hash, not by MLflow run id. Compare these with MLflow before claiming a specific run is deployed.",
+      "deployment": "ml-inference",
+      "namespace": "mlops-agent",
+      "image_tags": [
+        "1.0.0"
+      ],
+      "images": [
+        "ml-inference:1.0.0"
+      ],
+      "version_label": "1.0.0",
+      "configmap_app_version": "1.0.0",
+      "revision": "4",
+      "version_sources_consistent": true,
+      "ready_replicas": "2/2"
+    },
+    "error": null,
+    "duration_ms": 34.66,
+    "confirmation_token": null
+  }
+}

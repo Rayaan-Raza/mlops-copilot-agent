@@ -122,6 +122,14 @@ class FakeCore:
         self._chk()
         return NS(items=self.events)
 
+    def connect_get_namespaced_service_proxy_with_path(self, name, ns, path, **kw):
+        self._chk()
+        return (
+            '{"app_version": "1.0.0", "model": {"model_type": "random_forest", '
+            '"dataset_version": "v2", "test_f1": 0.951, "sha256": "115b5b3290e7", '
+            '"feature_names": ["a", "b"]}}'
+        )
+
     def read_namespaced_config_map(self, name, ns):
         return NS(data={"APP_VERSION": "1.0.0"})
 

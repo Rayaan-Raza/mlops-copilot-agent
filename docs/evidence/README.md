@@ -28,6 +28,17 @@ Files: [`failure-f1-imagepullbackoff.json`](failure-f1-imagepullbackoff.json), [
 | Diagnosis | The API was **degraded, not down**. `maxUnavailable: 0` kept both old pods serving (2/2 ready, Service endpoints healthy) |
 | Resolution | `kubectl -n mlops-agent rollout undo deployment/ml-inference`. Afterwards: tag `1.0.0`, consistent, 2/2 ready |
 
+## Failure investigation 3: API down with CrashLoopBackOff (injected, F2)
+
+Files: [`failure-f2-crashloop.json`](failure-f2-crashloop.json), [`failure-f2-restart-confirmed.json`](failure-f2-restart-confirmed.json), [`failure-f2-resolved.json`](failure-f2-resolved.json). Transcript: [`../conversations/04-diagnosis.json`](../conversations/04-diagnosis.json)
+
+| | |
+|---|---|
+| Injection | Set `SIMULATE_STARTUP_FAILURE=true` in the ConfigMap, then deleted all pods |
+| Agent trace | "Why is my prediction API unavailable?" → `k8s_diagnose_deployment` |
+| Evidence | 0/2 ready, `CrashLoopBackOff` after 4 restarts, readiness probe refused, and `RuntimeError: injected startup failure: model store unreachable` in the previous container's logs. `api_reachable_via_service=false` |
+| Resolution | Set the flag back to `false`, then ran `k8s_restart_deployment`. It returned `confirmation_required` and ran once confirmed. Afterwards: 2/2 ready and reachable |
+
 ## Other live checks (all `ok`)
 
 - **DVC**

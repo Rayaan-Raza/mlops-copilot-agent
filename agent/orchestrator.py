@@ -146,6 +146,9 @@ def build_default_registry(settings: Settings | None = None) -> ToolRegistry:
 
 def register_policy_tool(registry: ToolRegistry, settings: Settings) -> None:
     def _assess(a: RetrainingArgs):
+        if a.dag_id is None and a.last_pipeline_state is None and settings.airflow_allowed_dags:
+            # The LLM often omits it; the approved training DAG is the only sensible default.
+            a = a.model_copy(update={"dag_id": settings.airflow_allowed_dags[0]})
         inputs, sources = gather_retraining_evidence(registry, a)
         result = assess_retraining(
             **inputs,
